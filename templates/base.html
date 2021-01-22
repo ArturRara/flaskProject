@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Notes</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <script src="https://code.jquery.com/jquery-1.10.2.js"></script>
+    <link rel="stylesheet" href="/static/main.css"/>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+            integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+            crossorigin="anonymous"></script>
+
+    <link href='https://fonts.googleapis.com/css?family=Crimson+Pro&subset=latin,latin-ext' rel='stylesheet'
+          type='text/css'>
+    <link href="/styles/style.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #f2ab54">
+    <a class="navbar-brand" href="#">Password Managment</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav mr-auto">
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('login') }}">Logowanie</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('registration') }}">Rejestracja</a>
+            </li>
+            <li class="nav-item dropdown">
+                <a class="nav-link" href="{{ url_for('passwords') }}">Hasła</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('logout') }}"> Wyloguj </a>
+            </li>
+        </ul>
+    </div>
+</nav>
+    {% block body %}
+    {% endblock %}
+</body>
+</html>

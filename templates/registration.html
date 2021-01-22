@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block body %}
+
+    <body>
+    </div>
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <br>
+                <br>
+            </div>
+        </div>
+
+
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-sm-12 col-md-6 col-lg-4 text-center">
+                    <h3>Zarejestruj się</h3>
+                </div>
+            </div>
+            <div class="row justify-content-center">
+                <div class="col-sm-12 col-md-6 col-lg-4">
+                    <form id="registration-form" action="{{ url_for("registration") }}" method="post"
+                          enctype="multipart/form-data">
+
+
+                        <div class="form-group">
+                            <label for="login">Login</label>
+                            <input id="login" class="form-control required" type="text" name="login"/>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="password">Hasło</label>
+                            <input id="password" class="form-control required" type="password" name="password"/>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="repeat-password">Powtórz hasło</label>
+                            <input id="repeat-password" class="form-control required" type="password"
+                                   name="repeat-password"/>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="email">email</label>
+                            <input id="email" class="form-control required" type="email"
+                                   name="email"/>
+                        </div>
+
+                        <div class="form-group">
+                            <section class="text-danger">
+                                {% with messages = get_flashed_messages() %}
+                                    {% if messages %}
+                                        {% for message in messages %}
+                                            <div class="alert alert-danger" role="alert">
+                                                {{ message }}
+                                            </div>
+                                        {% endfor %}
+                                    {% endif %}
+                                {% endwith %}
+                            </section>
+                        </div>
+
+
+                        <button id="button-reg-form" type="submit" class="btn btn-secondary btn-block">Zarejestruj
+                        </button>
+
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    </div>
+
+
+    </body>
+    </html>
+{% endblock %}

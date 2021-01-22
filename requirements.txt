@@ -1,0 +1,8 @@
+flask_wtf
+flask
+flask_jwt_extended
+flask_sqlalchemy
+Werkzeug
+SQLAlchemy
+psycopg2-binary
+scrypt
