@@ -17,6 +17,8 @@ services:
       dockerfile: ./Dockerfile
     ports:
       - "80:80"
+    expose:
+      - 5000
     volumes:
       - .:/usr/src/app
     environment:
