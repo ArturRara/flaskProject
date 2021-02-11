@@ -1,8 +1,9 @@
 flask_wtf
-flask
+flask~=1.1.2
 flask_jwt_extended
 flask_sqlalchemy
-Werkzeug
+Werkzeug~=1.0.1
 SQLAlchemy
-psycopg2-binary
 scrypt
+psycopg2-binary
+pycryptodome

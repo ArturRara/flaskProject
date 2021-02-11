@@ -4,10 +4,12 @@ services:
     image: postgres
     restart: always
     environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: superuser
       POSTGRES_DB: postgres
-
+    ports:
+      - "5432:5432"
 
   flask-app:
     build:

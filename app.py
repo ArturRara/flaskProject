@@ -1,7 +1,8 @@
-from flask import Flask, request, render_template, make_response, flash
+from flask import Flask, request, render_template, make_response, flash, request
 from flask_wtf.csrf import CSRFProtect
 import time
 import re
+from datetime import datetime
 from flask_jwt_extended import (JWTManager, jwt_required, create_access_token, get_jwt_identity, set_access_cookies,
                                 unset_jwt_cookies)
 from hashlib import sha256
@@ -10,7 +11,11 @@ from psycopg2 import connect
 from exceptions import *
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-import random
+from Crypto.Cipher import AES
+from Crypto.Protocol.KDF import PBKDF2
+from Crypto import Random
+from Crypto.Util.Padding import pad, unpad
+
 app = Flask(__name__)
 
 # csrf = CSRFProtect(app)
@@ -23,12 +28,13 @@ app.config['JWT_COOKIE_SECURE'] = False
 app.config['JWT_COOKIE_CSRF_PROTECT'] = False
 jwt = JWTManager(app)
 
-DB_URL = 'postgresql+psycopg2://{user}:{pw}@{url}/{db}'.format(user='postgres', pw='superuser', url='localhost:5432',
+DB_URL = 'postgresql+psycopg2://{user}:{pw}@{url}/{db}'.format(user='postgres', pw='superuser', url='5432:5432',
                                                                db='postgres')
 app.config['SQLALCHEMY_DATABASE_URI'] = DB_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 db.create_all()
+
 
 class User(db.Model):
     __tablename__ = 'user'
@@ -36,6 +42,7 @@ class User(db.Model):
     login = db.Column(db.String(50), unique=True)
     password = db.Column(db.String(200))
     email = db.Column(db.String(50), unique=True)
+    loginAttempts = db.relationship('LoginAttempts', backref='user', lazy=True)
 
     def __init__(self, login, password, email):
         self.login = login
@@ -48,13 +55,29 @@ class Password(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     siteName = db.Column(db.String(50))
     login = db.Column(db.String(50))
-    password = db.Column(db.String(200))
+    password = db.Column(db.LargeBinary)
 
     def __init__(self, siteName, login, password):
         self.siteName = siteName
         self.login = login
         self.password = password
 
+
+class LoginAttempts(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    successful = db.Column(db.Boolean())
+    ip = db.Column(db.String(50))
+    date = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __init__(self, user_id, successful, ip):
+        self.user_id = user_id
+        self.successful = successful
+        self.ip = ip
+
+
+db.create_all()
+db.session.commit()
 
 
 @app.route('/')
@@ -69,7 +92,7 @@ def registration():
         try:
             form = request.form
             repeted_password = request.form['repeat-password']
-            if not((re.match('^.{8,30}$', form['password'])) and
+            if not ((re.match('^.{8,30}$', form['password'])) and
                     (re.match('^.{3,20}$', form['login'])) and
                     (form['password'] == repeted_password)):
                 raise InvalidForm()
@@ -79,7 +102,6 @@ def registration():
             if User.query.filter_by(email=form['email']).first():
                 raise EmailAlreadyUsed()
             password = generate_password_hash(form['password'], method='sha256')
-            print(form['login'])
             new_user = User(login=form['login'], password=password, email=form['email'])
             db.session.add(new_user)
             db.session.commit()
@@ -107,18 +129,28 @@ def login():
         time.sleep(2)
         try:
             login = request.form['login']
-            print(login)
             password = request.form['password']
             if (re.match('^.{8,30}$', password)) and (re.match('^.{3,30}$', login)):
                 user = User.query.filter_by(login=login).first()
-                if not user or not check_password_hash(user.password, password):
+                ip = request.remote_addr
+                if user:
+                    if check_password_hash(user.password, password):
+                        key = PBKDF2(password, user.email, 1000).decode('utf-8', "replace")[:16]
+                        access_token = create_access_token(identity={"login": login, "masterPbk": key})
+                        userPasswords = Password.query.filter_by(login=login).all()
+                        resp = make_response(render_template('passwords.html', userPasswords=userPasswords))
+                        set_access_cookies(resp, access_token, max_age=600)
+                        new_user = LoginAttempts(user_id=user.id, successful=True, ip=ip)
+                        db.session.add(new_user)
+                        db.session.commit()
+                        return resp
+                    else:
+                        new_user = LoginAttempts(successful=False, ip=ip, user_id=user)
+                        db.session.add(new_user)
+                        db.session.commit()
+                        raise InvalidForm()
+                else:
                     raise InvalidForm()
-
-                access_token = create_access_token(identity=login)
-                userPasswords = Password.query.filter_by(login=login).all()
-                resp = make_response(render_template('passwords.html', userPasswords=userPasswords))
-                set_access_cookies(resp, access_token, max_age=600)
-                return resp
             else:
                 raise InvalidCharacters()
         except InvalidForm:
@@ -144,15 +176,16 @@ def logout():
 def passwords():
     form = request.form
     if request.method == 'POST':
-        print(form)
         if form['password']:
             password = form['password']
         else:
-            password = generatePassword(User.query.filter_by(login=get_jwt_identity()).first().password, form['siteName'])
-        newPassword = Password(siteName=form['siteName'], login=get_jwt_identity(), password=password)
+            password = generatePassword(User.query.filter_by(login=get_jwt_identity()["login"]).first().password,
+                                        form['siteName'])
+        password = encrypt_data(password, get_jwt_identity()["masterPbk"])
+        newPassword = Password(siteName=form['siteName'], login=get_jwt_identity()["login"], password=password)
         db.session.add(newPassword)
         db.session.commit()
-    userPasswords = Password.query.filter_by(login=get_jwt_identity()).all()
+    userPasswords = Password.query.filter_by(login=get_jwt_identity()["login"]).all()
     if userPasswords:
         return render_template('passwords.html', form=form, userPasswords=userPasswords)
     return render_template('passwords.html', form=form)
@@ -161,15 +194,23 @@ def passwords():
 @app.route('/passwordsGet/<string:siteName>', methods=['GET', 'POST'])
 @jwt_required
 def passwordsGet(siteName):
-    password = Password.query.filter_by(login=get_jwt_identity(), siteName=siteName).first()
-    flash(password.password, category=siteName)
-    userPasswords = Password.query.filter_by(login=get_jwt_identity()).all()
+    password = Password.query.filter_by(login=get_jwt_identity()["login"], siteName=siteName).first()
+    flash(decrypt_data(password.password, get_jwt_identity()["masterPbk"]), category=siteName)
+    userPasswords = Password.query.filter_by(login=get_jwt_identity()["login"]).all()
     return render_template('passwords.html', userPasswords=userPasswords)
 
 
-if __name__ == '__main__':
-    app.run(debug=True)
-    db.create_all()
+@app.route('/loginAttempts')
+@jwt_required
+def loginAttempts():
+    user = User.query.filter_by(login=get_jwt_identity()["login"]).first()
+    loginAttempts = sorted(user.loginAttempts,
+                           key=lambda a: a.date, reverse=True)
+    time_format = r'%d/%m/%Y %H:%M:%S'
+    loginAttempts = [{'ip': a.ip, 'successful': a.successful, 'time': a.date.strftime(time_format)}
+                     for a in loginAttempts[:10]]
+
+    return render_template('loginAttempts.html', login_attempts=loginAttempts)
 
 
 def checkStrength(password):
@@ -182,7 +223,7 @@ def checkStrength(password):
         raise WeakPassword('Haslo musi zawierac conajmniej 8 znakow')
 
 
-def generatePassword(masterpass,site):
+def generatePassword(masterpass, site):
     key = site + masterpass
     pswd = key
     for i in range(1, 250):
@@ -190,3 +231,35 @@ def generatePassword(masterpass,site):
     pswd = pswd[:12]
 
     return pswd
+
+
+def encrypt_data(password, master_pass):
+    key = master_pass.encode("utf-8")
+
+    iv = Random.new().read(16)
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    data_to_encrypt = password.encode("utf-8")
+    padded_data = pad(data_to_encrypt, 16)
+    encrypted_data = cipher.encrypt(padded_data)
+    x = iv + encrypted_data
+    print(x)
+
+    return x
+
+
+def decrypt_data(password, master_pass):
+    print(password)
+    print(master_pass)
+
+    iv = password[:16]
+
+    key = master_pass.encode("utf-8")
+
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    plaintext_password = unpad(cipher.decrypt(password[16:]), 16).decode("utf-8")
+
+    return plaintext_password
+
+
+if __name__ == '__main__':
+    app.run(debug=True)

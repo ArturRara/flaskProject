@@ -1,10 +1,7 @@
-FROM python:3.7-alpine
-
-ENV FLASK_APP app.py
-ENV FLASK_RUN_HOST 0.0.0.0
-ENV FLASK_RUN_PORT 80
+FROM python:latest
 COPY . /app
 WORKDIR /app
+ADD requirements.txt requirements.txt
 RUN pip install -r requirements.txt
-RUN apk add --no-cache gcc musl-dev linux-headers openssl-dev libffi-dev
-CMD ["app.py"]
+COPY app.py app.py
+CMD ["python", "-u", "app.py"]

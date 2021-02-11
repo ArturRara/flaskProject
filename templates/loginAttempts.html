@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+
+{% block body %}
+<section class="container card mt-sm-5 mt-2">
+  <div class="card-body">
+    <h3 class="card-title text-center">Dane konta</h3>
+
+
+    <hr>
+
+    <section>
+      <h4>Historia logowań</h4>
+
+      <table class="table mt-3">
+        <thead>
+          <tr>
+            <th scope="col">Data</th>
+            <th scope="col">IP</th>
+            <th scope="col">Udane</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for login in login_attempts %}
+          <tr>
+            <td>{{ login.time }}</td>
+            <td>{{ login.ip }}</td>
+            <td>
+              {% if login.successful %}
+              <span class="text-success">TAK</span>
+              {% else %}
+              <span class="text-danger">NIE</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+  </div>
+</section>
+{% endblock %}
